@@ -1,0 +1,9 @@
+MANIFEST.in  
+memcache.py  
+memcache.pyc  
+python-memcached-1.53  
+python_memcached.egg-info/  
+README.md  
+setup.cfg  
+setup.py  
+test1.txt  

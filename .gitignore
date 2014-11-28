@@ -6,4 +6,5 @@ python_memcached.egg-info/
 README.md  
 setup.cfg  
 setup.py  
-test1.txt  
+test1.txt 
+simpleht.py 

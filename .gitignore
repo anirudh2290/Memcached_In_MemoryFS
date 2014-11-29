@@ -7,4 +7,8 @@ README.md
 setup.cfg  
 setup.py  
 test1.txt 
-simpleht.py 
+simpleht.py
+fusell.py
+fuse.py
+fuse.pyc
+fusemount/

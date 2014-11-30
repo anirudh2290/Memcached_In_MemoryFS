@@ -12,3 +12,4 @@ fusell.py
 fuse.py
 fuse.pyc
 fusemount/
+*.txt

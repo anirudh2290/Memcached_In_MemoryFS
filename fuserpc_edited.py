@@ -21,14 +21,31 @@ if not hasattr(__builtins__, 'bytes'):
 
 class Memory(LoggingMixIn, Operations):
     'Example memory filesystem. Supports only one level of files.'
+    
+
+    def transform(self,s):
+        print '='*10
+        print 'Inside transform'
+        print 'path to be transformed'
+        print s
+        print '='*10
+        if s == '/':
+            return '/'
+        pindex = len(s) - 1 #Modified for hierarchical FS
+        while pindex > 0: #Modified for hierarchical FS
+            if s[pindex] == '/': #Modified for hierarchical FS
+                break #Modified for hierarchical FS
+            pindex = pindex - 1 #Modified for hierarchical FS
+        hiepath = s[:(pindex + 1)] #Modified for hierarchical FS
+        return hiepath
 
     def __init__(self, distributedServer):
         self.files = distributedServer
         self.data = defaultdict(bytes)
         self.fd = 0
         now = time()
-        self.files['/'] = dict(st_mode=(S_IFDIR | 0755), st_ctime=now, st_mtime=now, st_atime=now, st_nlink=2, files_folders=Set(['/']))
-
+        #self.files['/'] = dict(st_mode=(S_IFDIR | 0755), st_ctime=now, st_mtime=now, st_atime=now, st_nlink=2, files_folders=Set(['/']))
+        self.files['/'] = dict(st_mode=(S_IFDIR | 0755), st_ctime=now, st_mtime=now, st_atime=now, st_nlink=2, files_folders=Set(['/']), hpath = '/')  #Modified for hierarchical FS
 
     def chmod(self, path, mode):
         ht = self.files[path]
@@ -44,18 +61,25 @@ class Memory(LoggingMixIn, Operations):
         ht['st_uid'] = uid
         ht['st_gid'] = gid
         self.files[path] = ht
-
+     
     def create(self, path, mode):
-        print 'Inside create'
-        print 'path is .. '
-        print path
-        print 'path'
+        #self.files[path] = dict(st_mode=(S_IFREG | mode), st_nlink=1,
+        #                        st_size=0, st_ctime=time(), st_mtime=time(),
+        #                        st_atime=time(), files_folders = '')
+       
+        hp = self.transform(path) 
         self.files[path] = dict(st_mode=(S_IFREG | mode), st_nlink=1,
                                 st_size=0, st_ctime=time(), st_mtime=time(),
-                                st_atime=time(), files_folders = '')
-        ht = self.files['/']
+                                st_atime=time(), files_folders = '',hpath = hp) #Modified for hierarchical FS
+        #ht = self.files['/']
+        print '='*10
+        print 'hpath is ' + str(self.files[hp])
+        print '='*10
+
+        ht = self.files[hp] #Modified for hierarchical FS
         ht['files_folders'].add(path)
-        self.files['/'] = ht
+        #self.files['/'] = ht
+        self.files[hp] = ht #Modified for hierarchical FS
         self.fd += 1
         return self.fd
 
@@ -83,18 +107,27 @@ class Memory(LoggingMixIn, Operations):
         return attrs.keys()
 
     def mkdir(self, path, mode):
-        print 'Inside mkdir'
-        print '='*10
-        print path
-        print '='*10        
-
+        #self.files[path] = dict(st_mode=(S_IFDIR | mode), st_nlink=2,
+        #                        st_size=0, st_ctime=time(), st_mtime=time(),
+        #                        st_atime=time(), files_folders=Set())         
+        hp = self.transform(path)
         self.files[path] = dict(st_mode=(S_IFDIR | mode), st_nlink=2,
                                 st_size=0, st_ctime=time(), st_mtime=time(),
-                                st_atime=time(), files_folders=Set())
-        ht = self.files['/']
+                                st_atime=time(), files_folders=Set(), hpath = hp) #Modified for hierarchical FS
+        #ht = self.files['/']
+         
+        ht = self.files[hp] #Modified for hierarchical FS
         ht['st_nlink'] += 1
+        
         ht['files_folders'].add(path)
-        self.files['/'] = ht
+        #self.files['/'] = ht 
+        self.files[hp] = ht #Modified for hierarchical FS
+        print '='*10
+        print 'Inside mkdir '
+        print 'Files list '
+        print self.files[hp]
+        print '='*10
+        
 
     def open(self, path, flags):
         self.fd += 1
@@ -110,7 +143,19 @@ class Memory(LoggingMixIn, Operations):
         return None
 
     def readdir(self, path, fh):
-        return ['.', '..'] + [x[1:] for x in self.files['/']['files_folders'] if x != '/']
+        #return ['.', '..'] + [x[1:] for x in self.files['/']['files_folders'] if x != '/']
+        print '='*10
+        print 'isnide readdir'
+        print 'path is ' + path
+        print '='*10
+        hp = self.transform(path)
+        print 'hp is ' + hp
+        print '='*10
+        print 'files_folders of hp'
+        print self.files[hp]['files_folders']
+        print '='*10
+        #return ['.', '..'] + [x[1:] for x in self.files[hp]['files_folders'] if x != '/' or x != hp ] #Modified for hierarchical FS 
+        return ['.', '..'] + [x[1:] for x in self.files[path]['files_folders'] if x != path ] #Modified for hierarchical FS 
 
     def readlink(self, path):
         return self.files[path]['files_folders']
@@ -136,10 +181,13 @@ class Memory(LoggingMixIn, Operations):
     def rmdir(self, path):
         #self.files.pop(path)
         del self.files[path]
-        ht = self.files['/']
+        #ht = self.files['/']
+        ht = self.files[hpath] #Modified for hierarchical FS 
         ht['st_nlink'] -= 1
         ht['files_folders'].remove(path)
-        self.files['/'] = ht
+        #self.files['/'] = ht
+        self.files[hpath] = ht #Modified for hierarchical FS 
+
 
     def setxattr(self, path, name, value, options, position=0):
         # Ignore options

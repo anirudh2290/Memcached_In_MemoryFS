@@ -13,3 +13,4 @@ fuse.py
 fuse.pyc
 fusemount/
 *.txt
+.fuserpc.py.swp

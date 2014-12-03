@@ -9,16 +9,20 @@ from xmlrpclib import Binary
 
 
 class memcacheht:
-   CONSTANT_TIMEOUT = 2000
+   CONSTANT_TIMEOUT = 20000
    def __init__(self, serverList):
       """
          Use the serverList to connect with the client. If no serverList given then use the 
          default local memcached server.   
       """
-      
+      print "Initialize serverList"
+      print serverList 
+      print "Initialize serverList"
+
       if (len(serverList) <= 0):
          self.mc = memcache.Client(['127.0.0.1:11211'], debug=0)
-      else: 
+      else:
+	 print "Inside else"
          self.mc = memcache.Client(serverList, debug=0)
    
    def __setitem__(self, key, value):
@@ -45,7 +49,7 @@ class memcacheht:
          
 def main():
    #serverList = ['127.0.0.1:11211', '127.0.0.1:11212']
-   serverList = ['127.0.0.1:11211']
+   #serverList = ['127.0.0.1:11211']
    ht2 = memcacheht(serverList)
    #sList = []
    #ht3 = memcacheht(sList)

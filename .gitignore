@@ -11,6 +11,6 @@ simpleht.py
 fusell.py
 fuse.py
 fuse.pyc
-fusemount/
+fusemount*
 *.txt
 .fuserpc.py.swp

@@ -39,7 +39,8 @@ class memcacheht:
       return val
    
    def __delitem__(self, key):
-      self.mc.set(str(key), "", 0) 
+      #self.mc.set(str(key), "", 0) 
+      self.mc.delete(str(key))
    
    def get(self, key):
       return self.mc.get(str(key))

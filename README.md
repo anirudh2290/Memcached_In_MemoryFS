@@ -26,6 +26,8 @@ python fuserpc _ edited.py fusemount/ 127.0.0.1:11211 127.0.0.1:11212
 
 To run the benchmarking tool
 ----------------------------
+For 1000 files
 
 python script.py -w 1000
+
 

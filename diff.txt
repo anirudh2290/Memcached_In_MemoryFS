@@ -1,0 +1,768 @@
+*** ClientServerfs/fuserpc.py	2014-12-07 12:45:27.212087402 -0500
+--- Memcached_In_MemoryFS/fuserpc_edited.py	2014-12-07 11:36:42.302004354 -0500
+***************
+*** 1,3 ****
+--- 1,4 ----
++ # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
+  #!/usr/bin/env python
+  
+  import logging
+***************
+*** 7,384 ****
+  from stat import S_IFDIR, S_IFLNK, S_IFREG
+  from sys import argv, exit
+  from time import time
+- #Added by Anirudh Subramanian begin
+- import xmlrpclib
+- import pickle
+- from xmlrpclib import Binary
+- #Added by Anirudh Subramanian End
+- 
+- 
+- 
+  
+  from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+  
+  if not hasattr(__builtins__, 'bytes'):
+      bytes = str
+  
+! metadata = "'"
+! 
+! #Added by Anirudh Subramanian to create a distributed client server in memory filesystem
+! 
+! class DistributedServer:
+  
+      """
+!          Wrapper functions so that the main client filesystem doesnt need to know if it is a single
+!          or a distributed filesytem 
+      """
+!     def __init__(self, urlList):
+!         self.currentIndex = 0
+!         self.datatable = []
+!         self.length = 10000
+!         self.listLength = len(urlList)
+!         self.count = (self.listLength)*(self.length)
+!         self.keyServerMapping = {}
+  
+-         for url in urlList:
+-             self.datatable.append(xmlrpclib.ServerProxy(url))
+-             print self.datatable
+-    
+-     def get(self, key):     
+-             index = self.keyServerMapping[key.data]
+-             return self.datatable[index].get(key)
+-    
+-     def put(self, key, value, ttl):
+-             if self.currentIndex == self.count: self.currentIndex = 0
+-             index = self.currentIndex % self.listLength
+-             self.keyServerMapping[key.data] = index
+-             returnVal = self.datatable[index].put(key, value, ttl)
+-             self.currentIndex = self.currentIndex + 1
+-             return returnVal
+-     
+-     def print_content(self):
+-            return self.datatable[self.currentIndex].print_content()
+-              
+- 
+- class Memory(LoggingMixIn, Operations):
+-     'Example memory filesystem. Supports only one level of files.'
+-     #Added by Anirudh Subramanian Begin
+-     #Added by Anirudh Subramanian End
+-     """  
+-         Call self.store to push metadata information corresponding to a file to simpleht service
+-         Note that pickle.dumps on any python object causes it to stringand stored in server. When we want
+-         to retrieve the data we do pickle.loads again to retrieve the object from the string
+      """
+      def __init__(self, distributedServer):
+!         self.files = {}
+!         #self.data = xmlrpclib.ServerProxy("http://127.0.0.1:51234")
+!         self.data = distributedServer
+!         #self.data = defaultdict(bytes)
+          self.fd = 0
+          now = time()
+!         #Commented and Added by Anirudh Subramanian Begin
+!         """
+!         self.files['/'] = dict(st_mode=(S_IFDIR | 0755), st_ctime=now,
+!                                st_mtime=now, st_atime=now, st_nlink=2)
+!         """
+!         
+!         metadatadict = dict(st_mode=(S_IFDIR | 0755), st_ctime=now,
+!                                st_mtime=now, st_atime=now, st_nlink=2)
+!         
+!         self.store(self.transform('/'), pickle.dumps(metadatadict))
+!         #Commented and Added by Anirudh Subramanian End
+  
+!     """Method added by Anirudh Subramanian to transform key to have a string padding"""
+!     """
+!        The metadata is the trailing character for the key.It is kept as apostrophe so that there
+!        arent any collisions between the metdata keys and the data keys
+      """
+-     def transform(self, s):
+-         return str(s + metadata)
+- 
+-     """Method added by Anirudh Subramanian to extract normal path from the string"""
+-     def extract(self, s):
+-         return s[:-1]
+- 
+-     """Method added by Anirudh Subramanian to Retrieve a property in metadata"""
+-     def retrieveDict(self, path):
+-         mdict = pickle.loads(self.data.get(Binary(self.transform(path)))['value'].data)
+-         return mdict
+- 
+-     """Method added by Anirudh Subramanian to Remove a property in metadata"""
+-     def deleteDict(self, path):
+-         self.data.put(Binary(self.transform(path)), Binary(pickle.dumps({})), 0) 
+-         self.files.pop(self.transform(path))
+-     """Method added by Anirudh Subramanian to store property in metadata"""
+-     def storeDict(self, path, mdict):
+-         self.store(self.transform(path), pickle.dumps(mdict))
+  
+      def chmod(self, path, mode):
+!         #Commented and Added by Anirudh Subramanian Begin
+!         """
+!         self.files[path]['st_mode'] &= 0770000
+!         self.files[path]['st_mode'] |= mode
+!         """
+!         metadatadict = self.retrieveDict(path)
+!         metadatadict['st_mode'] &= 0770000
+!         metadatadict['st_mode'] |= mode
+!         self.storeDict(path, metadatadict)
+!         #Commented and Added by Anirudh Subramanian End
+          return 0
+! 
+      def chown(self, path, uid, gid):
+!         
+!         #Commented and Added by Anirudh Subramanian Begin
+!         """
+!         self.files[path]['st_uid'] = uid
+!         self.files[path]['st_gid'] = gid
+!         """
+!         metadatadict = self.retrieveDict(path)
+!         metadatadict['st_uid'] = uid
+!         metadatadict['st_gid'] = gid
+!         self.storeDict(path, metadatadict)
+!         #Commented and Added by Anirudh Subramanian End
+  
+      def create(self, path, mode):
+!         #Commented and Added by Anirudh Subramanian Begin
+!         print "=============================================="
+!         print "Inside create"
+!         print "=============================================="
+!         metadatadict = dict(st_mode=(S_IFREG | mode), st_nlink=1,
+                                  st_size=0, st_ctime=time(), st_mtime=time(),
+!                                 st_atime=time())
+!         self.storeDict(path, metadatadict)
+!         self.store(path, pickle.dumps("")) 
+!         #Commented and Added by Anirudh Subramanian End
+  
+          self.fd += 1
+          return self.fd
+! 
+      def getattr(self, path, fh=None):
+!         #Commented and Added by Anirudh Subramanian Begin
+!         """
+!         if path not in self.files:
+              raise FuseOSError(ENOENT)
+-         """
+-         key = self.transform(path)
+-         print 'key is ' + key
+-         print 'mdict is '
+-         #mdict = self.retrieveDict(path)
+-         #print mdict
+-         try:
+-             self.data.get(Binary(key))
+-             print "===================================="
+-             print self.retrieveDict(path)
+-             print "===================================="
+-             return self.retrieveDict(path)
+-         except KeyError:
+-              print "In key errpr"
+-              raise FuseOSError(ENOENT)
+-         #return self.files[path]
+-         #Commented and Added by Anirudh Subramanian End
+  
+  
+      def getxattr(self, path, name, position=0):
+!         #Commented and Added by Anirudh Subramanian Begin
+!         #attrs = self.files[path].get('attrs', {})
+!         mdict = self.retrieveDict(path)
+!         attrs = mdict.get('attrs', {})
+          try:
+              return attrs[name]
+          except KeyError:
+              return ''       # Should return ENOATTR
+-         #Commented and Added by Anirudh Subramanian End
+  
+      def listxattr(self, path):
+!         #Commented and Added by Anirudh Subramanian Begin
+!         #attrs = self.files[path].get('attrs', {})
+!         mdict = self.retrieveDict(path)
+!         attrs = mdict.get('attrs', {})
+          return attrs.keys()
+-         #Commented and Added by Anirudh Subramanian End
+  
+      def mkdir(self, path, mode):
+!         #Commented and Added by Anirudh Subramanian Begin
+!         """
+          self.files[path] = dict(st_mode=(S_IFDIR | mode), st_nlink=2,
+                                  st_size=0, st_ctime=time(), st_mtime=time(),
+!                                 st_atime=time())
+! 
+!         self.files['/']['st_nlink'] += 1
+!         """
+!         metadatadict = dict(st_mode=(S_IFDIR | mode), st_nlink=2,
+!                                 st_size=0, st_ctime=time(), st_mtime=time(),
+!                                 st_atime=time())
+!         self.storeDict(path, metadatadict)
+!         mdictroot  = self.retrieveDict('/')
+!         mdictroot['st_nlink'] += 1
+!         self.storeDict('/', mdictroot)
+!         #Commented and Added by Anirudh Subramanian End
+  
+      def open(self, path, flags):
+          self.fd += 1
+          return self.fd
+  
+      def read(self, path, size, offset, fh):
+!         #Added and commented by Anirudh Subramanian
+!         i = self.data.get(Binary(path))['value']
+!         #arr = pickle.loads(i.data)['value']
+!         #arr = pickle.loads(i.data)['value']
+!         #arr = bytearray(arr)
+!         print "========================================================="
+!         print pickle.loads(i.data)
+!         print "========================================================="
+!         #j = pickle.loads(i.data)['value']
+!         print "Read output is =========================================="
+!         #print pickle.loads(i.data)['value']
+!         r = pickle.loads(i.data)
+!         print "========================================================="
+!         return r[offset:offset + size] 
+!         #return self.data[path][offset:offset + size]
+!         #Added and commented by Anirudh Subramanian
+      """
+!      Method modified to retrieve file names. The x[-1] == metadata is to check for the trailing character and make sure it
+!      is a directory or a  file and not just a file
+      """
+      def readdir(self, path, fh):
+!         #Added and commented by Anirudh Subramanian
+!         #return ['.', '..'] + [x[1:] for x in self.files if x != '/']
+!         return ['.', '..'] + [x[1:-1] for x in self.files if x != self.transform("/") and x[-1] == metadata]
+!         #Added and commented by Anirudh Subramanian
+  
+      def readlink(self, path):
+!         return pickle.loads(self.data.get(Binary(path))['value'].data)
+  
+      def removexattr(self, path, name):
+-         #Added and commented by Anirudh Subramanian
+-         
+-         mdict = self.retrieveDict(path)
+-         attrs = mdict.get('attrs', {})
+-         """
+          attrs = self.files[path].get('attrs', {})
+-         """
+          try:
+              del attrs[name]
+          except KeyError:
+              pass        # Should return ENOATTR
+!         #Added and commented by Anirudh Subramanian
+  
+      def rename(self, old, new):
+!         """
+!         if (self.data.get(Binary(path))):
+!            i = self.data.get(Binary(path))['value']
+!            self.store(path, pickle.dumps(pickle.loads(i.data)[:length]))
+!         
+!         """
+!         #Added and commented by Anirudh Subramanian
+          #self.files[new] = self.files.pop(old)
+!         mdict = self.retrieveDict(old)
+!         data1  = self.data.get(Binary(old))['value']
+!         #print "mdict is " + pickle.loads(mdict)
+!         print "data  is " + data1.data
+!         self.deleteDict(old)
+!         self.storeDict(new, mdict)
+!         self.store(new, pickle.dumps(pickle.loads(data1.data))) 
+!         #Added and commented by Anirudh Subramanian
+  
+      def rmdir(self, path):
+!         #Added and commented by Anirudh Subramanian
+!         """
+!         self.files.pop(path)
+!         
+!         self.files['/']['st_nlink'] -= 1
+!         """
+!         #self.data.pop(self.transform(path))
+!         self.deleteDict(path)
+!         mdict = self.retrieveDict('/') 
+!         mdict['st_nlink'] -= 1
+!         #Added and commented by Anirudh Subramanian
+  
+      def setxattr(self, path, name, value, options, position=0):
+-         #Added and commented by Anirudh Subramanian
+          # Ignore options
+!         mdict = self.retrieveDict(path)
+!         attrs = mdict.setdefault('attrs', {})
+!         #attrs = self.files[path].setdefault('attrs', {})
+          attrs[name] = value
+!         #Added and commented by Anirudh Subramanian
+  
+      def statfs(self, path):
+          return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
+  
+!     #Added by Anirudh Subramanian for storing using simple ht service begin
+!     def store(self, keyname, i):
+!         self.data.put(Binary(keyname), Binary(i), 20000)
+!         self.files[keyname] = 0
+!     #Added by Anirudh Subramanian for storing using simple ht service end
+! 
+      def symlink(self, target, source):
+!         metadatadict = dict(st_mode=(S_IFLNK | 0777), st_nlink=1,
+!                                   st_size=len(source))
+!         self.storeDict(target, metadatadict)
+!         #Commented and Added by Anirudh Subramanian Begin
+!         #self.data[target] = source
+!         print "inside symlink . source is" + source
+!         self.store(target, pickle.dumps(source)) 
+!         
+!         #Commented and Added by Anirudh Subramanian End
+! 
+  
+      def truncate(self, path, length, fh=None):
+!         print "Inside truncate ===================================================================="
+!         if (self.data.get(Binary(path))):
+!            print "Inside truncate ================================================================="
+!            i = self.data.get(Binary(path))['value']
+!            j = self.data.get(Binary(path))
+!            print pickle.loads(i.data)
+!            print "================================================================="
+!            self.store(path, pickle.dumps(pickle.loads(i.data)[:length]))
+!            print "Inside truncate ================================================================="
+!              
+!         else:
+!            #self.store(path, pickle.dumps(pickle.loads(Binary("").data)))
+!            self.store(path, pickle.dumps(""))
+!         mdict = self.retrieveDict(path)
+!         mdict['st_size'] = length
+!         self.storeDict(path, mdict)
+!         #Commented and Added by Anirudh Subramanian Begin
+!         #self.data[path] = self.data[path][:length]
+!         #self.files[path]['st_size'] = length
+!         #Commented and Added by Anirudh Subramanian End
+  
+      def unlink(self, path):
+!         #Commented and Added by Anirudh Subramanian Begin
+!         #self.data.pop(self.transform(path))
+!         self.deleteDict(path)
+!         #Commented and Added by Anirudh Subramanian End
+  
+      def utimens(self, path, times=None):
+          now = time()
+          atime, mtime = times if times else (now, now)
+!         mdict = self.retrieveDict(path)
+!         mdict['st_atime'] = atime
+!         mdict['st_mtime'] = mtime
+!         self.storeDict(path, mdict)
+!         #self.files[path]['st_atime'] = atime
+!         #self.files[path]['st_mtime'] = mtime
+  
+      def write(self, path, data, offset, fh):
+!         #Commented and added by Anirudh Subramanian Begin
+!         i = self.data.get(Binary(path))['value']
+!         print 'i is ' + pickle.loads(i.data)
+!         if i:
+!            j = self.data.get(Binary(path))['value']
+!            r = pickle.loads(j.data)
+!            finaldata = r[:offset] + data
+          else:
+!            finaldata = data
+!         lengthData = len(finaldata)
+!         #self.data[path] = self.data[path][:offset] + data
+!         self.store(path, pickle.dumps(finaldata))
+!         mdict = self.retrieveDict(path)
+!         mdict['st_size'] = lengthData      
+!         #self.files[path]['st_size'] = lengthData
+!         self.storeDict(path, mdict)
+!         #Commented and added by Anirudh Subramanian End
+          return len(data)
+  
+  
+--- 8,361 ----
+  from stat import S_IFDIR, S_IFLNK, S_IFREG
+  from sys import argv, exit
+  from time import time
+  
+  from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+  
++ from sets import Set
++ from memcacheht import memcacheht
++ 
+  if not hasattr(__builtins__, 'bytes'):
+      bytes = str
++         
++            
+  
+! class Memory(LoggingMixIn, Operations):
+!     'Example memory filesystem. Supports only one level of files.'
+!    
+!     """
+! 	transform extracts the parent path from the current path
+! 	So if current path is /mtr/tp/tp1 parent path will be /mtr/tp
+!     """ 
+! 
+!     def transform(self,s):
+!         if s == '/':
+!             return '/'
+!         pindex = len(s) - 1 #Modified for hierarchical FS
+!         hiepath = ''
+!         while pindex > 0: #Modified for hierarchical FS
+!             if s[pindex] == '/': #Modified for hierarchical FS
+!                 break #Modified for hierarchical FS
+!             pindex = pindex - 1 #Modified for hierarchical FS
+!         hiepath = s[:pindex] #Modified for hierarchical FS
+!         if hiepath == '':
+!             hiepath = '/'        
+!         return hiepath
+! 
+! 
+!     def ltransform(self,s):
+!         plindex = len(s) - 1
+!         while plindex > 0:
+!             if s[plindex] == '/':
+!                 break
+!             plindex = plindex - 1
+!         hielpath = s[(plindex)+1:len(s)]
+!         return hielpath
+  
+      """
+! 	ltransform extracts current folder or filename from full path 
+! 	name that goes into the key. Therefore if current path is
+! 	/mtr/tp/tp1 the output will be tp1
+      """
+!     def ltransformparent(self, s, parent):
+!         if parent == '/':
+!             return s[1:]        
+!         sx = str(s)
+!         px = str(parent) + '/'
+!         if(sx.startswith(px)):
+!             return s[len(px):]
+  
+      """
++ 	Passed in the memcacheht object which will be the backend
++ 	memcached hashtable that will be used
++ 		
++     """	
++ 
+      def __init__(self, distributedServer):
+!         self.files = distributedServer
+!         self.data = defaultdict(bytes)
+          self.fd = 0
+          now = time()
+!         #self.files['/'] = dict(st_mode=(S_IFDIR | 0755), st_ctime=now, st_mtime=now, st_atime=now, st_nlink=2, files_folders=Set(['/']))
+!         self.files['/'] = dict(st_mode=(S_IFDIR | 0755), st_ctime=now, st_mtime=now, st_atime=now, st_nlink=2, files_folders=Set(['/']), hpath = '/')  #Modified for hierarchical FS
+  
+!     """	
+! 	chmod retrieves the hash table and modifies the mode for the files
+      """
+  
+      def chmod(self, path, mode):
+!         ht = self.files[path]
+!         ht['st_mode'] &= 0770000
+!         ht['st_mode'] |= mode
+!         self.files[path] = ht
+!         #self.files[path]['st_mode'] &= 0770000
+!         #self.files[path]['st_mode'] |= mode
+          return 0
+!     
+!     """
+! 	chown retrieves the hash table and changes the user id and group id and writes
+! 	it back to the hash table
+!     """
+      def chown(self, path, uid, gid):
+!         ht = self.files[path]
+!         ht['st_uid'] = uid
+!         ht['st_gid'] = gid
+!         self.files[path] = ht
+!      
+!     """
+! 	creates the key value pair for the new file. The value will be the metadata dict
+! 	and the files_folders key inside the value which stores contents will be initially
+! 	blank
+!     """
+  
+      def create(self, path, mode):
+!         #self.files[path] = dict(st_mode=(S_IFREG | mode), st_nlink=1,
+!         #                        st_size=0, st_ctime=time(), st_mtime=time(),
+!         #                        st_atime=time(), files_folders = '')
+!        
+!         hp = self.transform(path) 
+!         self.files[path] = dict(st_mode=(S_IFREG | mode), st_nlink=1,
+                                  st_size=0, st_ctime=time(), st_mtime=time(),
+!                                 st_atime=time(), files_folders = '',hpath = hp) #Modified for hierarchical FS
+!         #ht = self.files['/']
+  
++         ht = self.files[hp] #Modified for hierarchical FS
++         ht['files_folders'].add(path)
++         #self.files['/'] = ht
++         self.files[hp] = ht #Modified for hierarchical FS
+          self.fd += 1
+          return self.fd
+!     
+!     """
+! 	getattr retrieves the dict and retrieves the attr key inside the 
+! 	value
+!     """
+!     	
+      def getattr(self, path, fh=None):
+!         hpath = self.transform(path)
+!         ht = self.files[hpath]
+!         if path not in self.files[hpath]['files_folders']:
+              raise FuseOSError(ENOENT)
+  
++         return self.files[path]
+  
++     """
++ 	getxattr retrieves the custom defined attr which retrieves the value corresponding to the key - name
++     """
+      def getxattr(self, path, name, position=0):
+!         attrs = self.files[path].get('attrs', {})
+! 
+          try:
+              return attrs[name]
+          except KeyError:
+              return ''       # Should return ENOATTR
+  
++     """
++ 	lists all custom defined attributes
++     """
+      def listxattr(self, path):
+!         attrs = self.files[path].get('attrs', {})
+          return attrs.keys()
+  
++     """
++ 	mkdir creates a dict value corresponding to the key path.
++ 	modifications made to the link numbers and files_folders
++ 	of the parent path
++     """
+      def mkdir(self, path, mode):
+!         #self.files[path] = dict(st_mode=(S_IFDIR | mode), st_nlink=2,
+!         #                        st_size=0, st_ctime=time(), st_mtime=time(),
+!         #                        st_atime=time(e, files_folders=Set())         
+!         hp = self.transform(path)
+          self.files[path] = dict(st_mode=(S_IFDIR | mode), st_nlink=2,
+                                  st_size=0, st_ctime=time(), st_mtime=time(),
+!                                 st_atime=time(), files_folders=Set(), hpath = hp) #Modified for hierarchical FS
+!         #ht = self.files['/']
+!          
+!         ht = self.files[hp] #Modified for hierarchical FS
+!         ht['st_nlink'] += 1
+!         ht['files_folders'].add(path)
+!         ht['files_folders'].add(hp)
+!         #self.files['/'] = ht 
+!         self.files[hp] = ht #Modified for hierarchical FS
+!         hpp = self.transform(hp)
+!         ht2 = self.files[hpp]
+!         
+  
+      def open(self, path, flags):
+          self.fd += 1
+          return self.fd
+  
++     """
++ 	reads the file
++     """
+      def read(self, path, size, offset, fh):
+!         ht = self.files[path]
+!         if 'files_folders' in ht:
+!             return ht['files_folders'][offset:offset + size]
+!         return None
+! 
+      """
+!         traverses through the files_folders to read contents of the folder
+      """
++ 
+      def readdir(self, path, fh):
+!         #return ['.', '..'] + [x[1:] for x in self.files['/']['files_folders'] if x != '/']
+!         hp = self.transform(path)
+!         #return ['.', '..'] + [x[1:] for x in self.files[hp]['files_folders'] if x != '/' or x != hp ] #Modified for hierarchical FS 
+!         return ['.', '..'] + [self.ltransformparent(x, path) for x in self.files[path]['files_folders'] if (self.ltransformparent(x, path) != '' and self.ltransformparent(x, path) != None)] #Modified for hierarchical FS 
+! 
+! 
+!     
+  
+      def readlink(self, path):
+!         return self.files[path]['files_folders']
+  
++     """
++ 	Removes custom defined attributes.
++ 	removes attr corresponding to key name in attrs dict inside the metadata
++ 	
++     """
+      def removexattr(self, path, name):
+          attrs = self.files[path].get('attrs', {})
+          try:
++ 	    ht = self.files[path]
+              del attrs[name]
++ 	    ht['attrs'] = attrs
++ 	    self.files[path] = ht	
+          except KeyError:
+              pass        # Should return ENOATTR
+! 
+!     """
+! 	renames files_folders associates files_folders with new and
+! 	removes old
+!     """
+  
+      def rename(self, old, new):
+!         temp = self.files[old]
+!         hp = self.transform(old)
+!         self.files[new] = temp
+!         del self.files[old]
+          #self.files[new] = self.files.pop(old)
+!         ht = self.files[hp]
+!         new1 = self.transform(new)
+!         htnew1 = self.files[new1]
+!         htnew1['files_folders'].add(new)
+!         ht['files_folders'].remove(old)
+!         self.files[hp] = ht
+!         self.files[new1] = htnew1
+! 
+!     """
+! 	Removes the folder corresponding to the path
+! 	by removing links from parent path and then
+! 	deleting the key from the hash table
+!     """
+  
+      def rmdir(self, path):
+!         #self.files.pop(path)
+!         hpath = self.transform(path)
+!         del self.files[path]
+!         #ht = self.files['/']
+!         ht = self.files[hpath] #Modified for hierarchical FS 
+!         ht['st_nlink'] -= 1
+!         ht['files_folders'].remove(path)
+!         #self.files['/'] = ht
+!         self.files[hpath] = ht #Modified for hierarchical FS 
+! 
+! 
+!     """
+! 	sets custom defined attribute corresponding to the key "name"
+!     """
+  
+      def setxattr(self, path, name, value, options, position=0):
+          # Ignore options
+!         ht = self.files[path]
+!         attrs = self.files[path].setdefault('attrs', {})
+          attrs[name] = value
+!         ht['attrs'] = attrs
+!         self.files[path] = ht
+  
++     """
++ 	outputs stats for the directory including size no of links,
++ 	permissions etc. 
++     """
+      def statfs(self, path):
+          return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
+  
+!     """
+! 	symlink copies the files_folders of the source into the new 
+! 	metadata of the target
+!     """
+      def symlink(self, target, source):
+!         'creates a symlink `target -> source` (e.g. ln -s source target)'
+! 	hp = self.transform(target)
+!         self.files[target] = dict(st_mode=(S_IFLNK | 0777), st_nlink=1,
+!                                   st_size=len(source), files_folders=(source), hpath=hp)
+! 		
+! 	ht = self.files[hp]
+! 	ht['files_folders'].add(target)
+! 	self.files[hp] = ht
+! 	
+! 	"""
+! 	hpath = self.transform(source)
+!         ht = self.files[hpath]
+!         target1 = self.transform(target)
+!         httarget1 = self.files[hpath]
+!         ht['files_folders'].add(source)
+!         httarget1['files_folders'].add(target)
+!         self.files[hpath] = ht
+!         self.files[httarget1] = httarget1
+! 	"""
+  
++     """
++ 	truncates upto length of a file
++     """
+      def truncate(self, path, length, fh=None):
+!         ht = self.files[path]
+!         if 'files_folders' in ht:
+!             ht['files_folders'] = ht['files_folders'][:length]
+!         ht['st_size'] = length
+!         self.files[path] = ht
+! 
+!     """
+! 	unlink key value corresponding to the path
+!     """
+  
+      def unlink(self, path):
+!         #self.files.pop(path)
+!         hpath = self.transform(path)
+!         ht = self.files[hpath]
+!         ht['files_folders'].remove(path)
+!         self.files[hpath] = ht
+!         del self.files[path]
+  
++     """
++ 	Modifies the atime and mtime  corresponding to the
++ 	path key 
++     """
+      def utimens(self, path, times=None):
+          now = time()
+          atime, mtime = times if times else (now, now)
+!         self.files[path]['st_atime'] = atime
+!         self.files[path]['st_mtime'] = mtime
+  
++     """
++ 	writes the data to a file by modifying the value corresponding to files_folders
++     """
++     
+      def write(self, path, data, offset, fh):
+!         """
+!         self.data[path] = self.data[path][:offset] + data
+!         self.files[path]['st_size'] = len(self.data[path])
+!         return len(data)
+!         """
+!         ht = self.files[path]
+!         if len(ht['files_folders']) > (len(data) + offset):
+!             ht['files_folders'] = ht['files_folders'][:offset] + data + ht['files_folders'][offset:]
+          else:
+!             ht['files_folders'] = ht['files_folders'][:offset] + data
+!         ht['st_size'] = len(ht['files_folders'])
+!        
+!         self.files[path] = ht 
+          return len(data)
+  
+  
+***************
+*** 388,396 ****
+          exit(1)
+  
+      logging.getLogger().setLevel(logging.DEBUG)
+!     db = DistributedServer(argv[2:])
+      #db.put(Binary('hello'), Binary('random'), 20000)
+      #print db.get(Binary('hello'))
+      #Modified by Anirudh Subramanian to enable logging Begin
+!     fuse = FUSE(Memory(db), argv[1], foreground=True, debug=True)
+      #Modified by Anirudh Subramanian to enable logging End
+--- 365,376 ----
+          exit(1)
+  
+      logging.getLogger().setLevel(logging.DEBUG)
+!     #Modified the distributed server to memcache client server
+!     mht = memcacheht(argv[2:])
+!     mht[1] = "qwdw"
+!     del mht[1]
+      #db.put(Binary('hello'), Binary('random'), 20000)
+      #print db.get(Binary('hello'))
+      #Modified by Anirudh Subramanian to enable logging Begin
+!     fuse = FUSE(Memory(mht), argv[1], foreground=True, debug=True)
+      #Modified by Anirudh Subramanian to enable logging End
